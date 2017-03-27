@@ -9,38 +9,37 @@ from bokeh.plotting import figure, output_file, show
 from bokeh import embed
 
 import time
-import cgi
+
+#quandl.ApiConfig.api_key = 'FAP42o7yZGu6XznAiLze'
+#data = quandl.get_table('WIKI/PRICES')
 
 def tickers():
 
-        options = request.form.getlist('feature')
-	stock = request.form['stock']
+    options = request.form.getlist('feature')
+    stock = request.form['stock']
         stock = stock.upper()
 
-        nw = datetime.now()
-	start_date = (nw - timedelta(days=30)).strftime('%Y-%m-%d')
-	end_date = nw.strftime('%Y-%m-%d')
-	req_url = 'https://www.quandl.com/api/v3/datasets/WIKI/'+stock+'.json?start_date='+start_date+'&end_date='+end_date+'&order=asc&api_key=FAP42o7yZGu6XznAiLze'
-	r = requests.get(req_url)
+    rn = datetime.now()
+    start_date = (rn - timedelta(days=30)).strftime('%Y-%m-%d')
+    end_date = rn.strftime('%Y-%m-%d')
+    req_url = 'https://www.quandl.com/api/v3/datasets/WIKI/'+stock+'.json?start_date='+start_date+'&end_date='+end_date+'&order=asc&api_key=FAP42o7yZGu6XznAiLze'
+    r = requests.get(req_url)
         
-        # pandas in action
-	request_df = DataFrame(r.json()) 
-	df = DataFrame(request_df.ix['data','dataset'], columns = request_df.ix['column_names','dataset'])
-	df.columns = [x.lower() for x in df.columns]
-	df = df.set_index(['date'])
-	df.index = to_datetime(df.index)
-	
-	  
-       
+    request_df = DataFrame(r.json()) 
+    df = DataFrame(request_df.ix['data','dataset'], columns = request_df.ix['column_names','dataset'])
+    df.columns = [x.lower() for x in df.columns]
+    df = df.set_index(['date'])
+    df.index = to_datetime(df.index)
+    
 
-	p = figure(x_axis_type = "datetime")
-	if 'open' in options:
-	    p.line(df.index, df['open'], color='black', legend='Opening Price')
-	if 'high' in options:
-	    p.line(df.index, df['high'], color='red', legend='Highest Price')
-	if 'close' in options:
-	    p.line(df.index, df['close'], color='blue', legend='Closing Price')
-	return p
+    p = figure(x_axis_type = "datetime")
+    if 'open' in options:
+        p.line(df.index, df['open'], color='yellow', legend='Opening Price')
+    if 'high' in options:
+        p.line(df.index, df['high'], color='red', legend='Highest Price')
+    if 'close' in options:
+        p.line(df.index, df['close'], color='black', legend='Closing Price')
+    return p
 
 
 app = Flask(__name__)
@@ -52,16 +51,16 @@ def main():
 
 @app.route('/index', methods=['GET', 'POST'])
 def index():
-	return render_template('milestone.html')
+    return render_template('milestone.html')
       
  
-
-@app.route('/output',methods=['GET','POST'])
+ @app.route('/output',methods=['GET','POST'])
 def chart():
-	plot = output()
-	script, div = embed.components(plot)
-	return render_template('page.html', script=script, div=div)
-	
+    plot = ticker()
+    script, div = embed.components(plot)
+    return render_template('page.html', script=script, div=div)
+    
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
