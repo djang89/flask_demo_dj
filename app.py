@@ -17,7 +17,7 @@ def tickers():
 
     options = request.form.getlist('feature')
     stock = request.form['stock']
-        stock = stock.upper()
+    stock = stock.upper()
 
     rn = datetime.now()
     start_date = (rn - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -54,9 +54,9 @@ def index():
     return render_template('milestone.html')
       
  
- @app.route('/output',methods=['GET','POST'])
+@app.route('/output',methods=['GET','POST'])
 def chart():
-    plot = ticker()
+    plot = tickers()
     script, div = embed.components(plot)
     return render_template('page.html', script=script, div=div)
     
