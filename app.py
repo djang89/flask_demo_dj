@@ -1,81 +1,49 @@
-import pandas as pd
-import numpy as np
-import matplotlib as plt
-import quandl
+from flask import Flask, render_template, request, redirect, url_for
+from datetime import datetime,timedelta
 import requests
-from flask import Flask, render_template, request, redirect
-import datetime as dt
-import bokeh
-from bokeh.embed import components
-from bokeh.plotting import figure
-import os
+import json
+import pandas as pd
+from pandas import DataFrame, to_datetime
+import numpy as np
+from bokeh.plotting import figure, output_file, show
+from bokeh import embed
 
-#quandl.ApiConfig.api_key = 'FAP42o7yZGu6XznAiLze'
+import time
+import cgi
 
-#data = quandl.get_table('WIKI/PRICES') 
+def tickers():
 
-#fetch quandl dataset
-def fetch_quandl(ticker, apiKey) :
+        options = request.form.getlist('feature')
+	stock = request.form['stock']
+        stock = stock.upper()
 
-    ticker = ticker.upper()
+        nw = datetime.now()
+	start_date = (nw - timedelta(days=30)).strftime('%Y-%m-%d')
+	end_date = nw.strftime('%Y-%m-%d')
+	req_url = 'https://www.quandl.com/api/v3/datasets/WIKI/'+stock+'.json?start_date='+start_date+'&end_date='+end_date+'&order=asc&api_key=FAP42o7yZGu6XznAiLze'
+	r = requests.get(req_url)
+        
+        # pandas in action
+	request_df = DataFrame(r.json()) 
+	df = DataFrame(request_df.ix['data','dataset'], columns = request_df.ix['column_names','dataset'])
+	df.columns = [x.lower() for x in df.columns]
+	df = df.set_index(['date'])
+	df.index = to_datetime(df.index)
+	
+	  
+       
 
-    now = dt.datetime.now().date()
-    then = now - dt.timedelta(days=30)
-    then = "&start_date=" + then.strftime("%Y-%m-%d")
-    now  = "&end_date=" + now.strftime("%Y-%m-%d")
-
-    r = requests.get('https://www.quandl.com/api/v3/datasets/WIKI/' + ticker + '.json?api_key=FAP42o7yZGu6XznAiLze' + now + then)
-
-    if r.status_code < 400 :
-        # name of stock's company
-        name = r.json()['dataset']['name']
-        name = name.split('(')[0]
-
-        # get data
-        dat = r.json()['dataset']
-        df = DataFrame(dat['data'], columns=dat['column_names'] )
-        df = df.set_index(pd.DatetimeIndex(df['Date']))
-
-    else :
-        print "Stock ticker not valid"
-        df = None
-        name = None
-
-    return df, name
-
-
-#create plot
-def stockplot(df, priceReq, tickerText ):
-
-    print "priceReq : ", priceReq, type(priceReq)
-
-    p = figure(x_axis_type="datetime", width=800, height=600)
+	p = figure(x_axis_type = "datetime")
+	if 'open' in options:
+	    p.line(df.index, df['open'], color='black', legend='Opening Price')
+	if 'high' in options:
+	    p.line(df.index, df['high'], color='red', legend='Highest Price')
+	if 'close' in options:
+	    p.line(df.index, df['close'], color='blue', legend='Closing Price')
+	return p
 
 
-    if type(priceReq) == list :
-        for req in priceReq:
-            p.line(df.index, df[priceReq[req]], legend=req, line_width='3')
-    else :
-        p.line(df.index, df[priceReq], legend=priceReq, line_width='3')
-
-    p.title = tickerText + " Prices"
-
-    p.grid.grid_line_alpha=0.3
-    p.xaxis.axis_label = 'Date'
-    p.yaxis.axis_label = 'Price'
-    p.legend.orientation = "up_left"
-
-    if 0:
-        bokeh.io.output_file('templates/page.html')
-        bokeh.io.save(p)
-
-    script, div = components(p)
-    return script, div
-    
-                 
 app = Flask(__name__)
-
-app.vars = {}
 
 
 @app.route('/')
@@ -84,28 +52,16 @@ def main():
 
 @app.route('/index', methods=['GET', 'POST'])
 def index():
-    return render_template('milestone.html')
+	return render_template('milestone.html')
+      
+ 
 
-@app.route('/plotpage', methods=['POST'])
-def plotpage():
-    tickStr = request.form['tickerText']
-    reqList = request.form['priceCheck'] # checkboxes
-
-    app.vars['ticker'] = tickStr.upper()
-    app.vars['priceReqs'] = reqList
-
-    df,name = fetch_quandl(app.vars['ticker'], app.vars['apiKey'])
-
-
-    if not type(df) == DataFrame :
-        msg = "Invalid Ticker."
-        return render_template('milestone.html', msg=msg)
-    else:
-        script, div = make_figure(df, app.vars['priceReqs'], app.vars['ticker'] )
-        return render_template('page.html', script=script, div=div, ticker=name)
-
-
-
-if __name__ == "__main__":
+@app.route('/output',methods=['GET','POST'])
+def chart():
+	plot = output()
+	script, div = embed.components(plot)
+	return render_template('page.html', script=script, div=div)
+	
+if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
